@@ -40,20 +40,17 @@ public:
     // Line operations.
     bool insertLine(
         int lineNumber,
-        const std::string& text
-    );
+        const std::string& text);
 
     bool deleteLine(int lineNumber);
 
     bool getLine(
         int lineNumber,
-        std::string& result
-    ) const;
+        std::string& result) const;
 
     bool updateLine(
         int lineNumber,
-        const std::string& text
-    );
+        const std::string& text);
 
     bool appendLine(const std::string& text);
 
@@ -61,15 +58,13 @@ public:
     bool insertText(
         int lineNumber,
         int position,
-        const std::string& text
-    );
+        const std::string& text);
 
     bool deleteText(
         int lineNumber,
         int position,
         int length,
-        std::string& deletedText
-    );
+        std::string& deletedText);
 
     // Document output.
     void display() const;
