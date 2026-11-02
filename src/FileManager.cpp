@@ -36,7 +36,7 @@ bool FileManager::openFile(const std::string& filename, Document& document)
 
 bool FileManager::saveFile(const std::string& filename, const Document& document)
 {
-    std::ofstream output(filename, std::ios::out | std::ios::trunc);
+    std::ofstream output(filename, std::ios::out | std::ios::trunc | std::ios::binary);
     if (!output.is_open())
     {
         return false;
