@@ -411,8 +411,10 @@ bool TextAlgorithms::replaceAll(
     Document& document,
     const std::string& pattern,
     const std::string& replacement,
+    TextChangeArray& changes,
     int& replacementCount)
 {
+    changes.clear();
     replacementCount = 0;
 
     if (pattern.length() == 0 || document.isEmpty())
@@ -448,6 +450,52 @@ bool TextAlgorithms::replaceAll(
     {
         return false;   // pattern not found
     }
+
+    // ---------------- Phase 1.5: record changes for undo ----------------
+
+for (int lineNumber = 1; lineNumber <= lineCount; ++lineNumber)
+{
+    std::string line;
+
+    if (!document.getLine(lineNumber, line))
+    {
+        changes.clear();
+        return false;
+    }
+
+    int searchFrom = 0;
+
+    while (true)
+    {
+        int position = findInLine(line, pattern, searchFrom);
+
+        if (position < 0)
+        {
+            break;
+        }
+
+        TextChange change;
+        change.lineNumber = lineNumber;
+        change.position = position;
+        change.oldText = pattern;
+        change.newText = replacement;
+
+        if (!changes.add(change))
+        {
+            changes.clear();
+            return false;
+        }
+
+        // Skip the matched text to avoid overlapping replacements.
+        searchFrom = position + static_cast<int>(pattern.length());
+    }
+}
+
+if (changes.getSize() != totalMatches)
+{
+    changes.clear();
+    return false;
+}
 
     // Backup of every line we are about to change (for rollback)
     std::string* backupText = new (std::nothrow) std::string[affectedLines];

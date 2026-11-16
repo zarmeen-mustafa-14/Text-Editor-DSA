@@ -3,6 +3,7 @@
 
 #include <string>
 #include "Document.h"
+#include "UndoStack.h"
 
 struct MatchPosition {
     int lineNumber;
@@ -50,6 +51,7 @@ public:
         Document& document,
         const std::string& pattern,
         const std::string& replacement,
+        TextChangeArray& changes,
         int& replacementCount
     );
 };
