@@ -1,7 +1,7 @@
 #ifndef DOCUMENT_H
 #define DOCUMENT_H
 
-#include <string>
+#include "MyString.h"
 
 class Document
 {

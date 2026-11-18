@@ -1,7 +1,7 @@
 #ifndef TEXTALGORITHMS_H
 #define TEXTALGORITHMS_H
 
-#include <string>
+#include "MyString.h"
 #include "Document.h"
 #include "UndoStack.h"
 
@@ -35,22 +35,22 @@ class TextAlgorithms {
 public:
     static bool findAll(
         const Document& document,
-        const std::string& pattern,
+        const MyString& pattern,
         MatchArray& results
     );
 
     static bool replaceFirst(
         Document& document,
-        const std::string& pattern,
-        const std::string& replacement,
+        const MyString& pattern,
+        const MyString& replacement,
         MatchPosition& changedPosition,
-        std::string& originalText
+        MyString& originalText
     );
 
     static bool replaceAll(
         Document& document,
-        const std::string& pattern,
-        const std::string& replacement,
+        const MyString& pattern,
+        const MyString& replacement,
         TextChangeArray& changes,
         int& replacementCount
     );

@@ -1,6 +1,40 @@
-
+// ============================================================================
+// TextAlgorithms.cpp
+// CS-218 Data Structures and Algorithms - Text Editor (CEP)
+//
+// Implements:
+//   - MatchArray      : custom dynamic array for search results
+//   - TextAlgorithms  : findAll(), replaceFirst(), replaceAll()
+//
+// Library usage:
+//   No built-in string facilities are used. There is no std::string, no
+//   <cstring>, and no strlen/strcpy/find/substr/append/compare. All text is
+//   held in the project's own MyString class. Searching, copying and building
+//   of lines are written by hand with loops over characters; only the
+//   MyString members length(), operator[] and the MyString(const char*)
+//   constructor are used here. New lines are built in a manually allocated
+//   char buffer and then handed to Document::updateLine().
+//
+// Project conventions followed:
+//   - Line numbers are 1-based, character positions are 0-based
+//   - Search is case-sensitive and works on individual lines
+//   - findAll() reports OVERLAPPING matches
+//   - replaceFirst()/replaceAll() work on NON-overlapping matches
+//   - Expected failures are reported through return values (no exceptions)
+//
+// Return value contract:
+//   findAll()      : true  -> search completed (results.getSize() may be 0)
+//                    false -> empty pattern, empty document, or memory failure
+//   replaceFirst() : true  -> exactly one replacement was made
+//                    false -> nothing changed (empty pattern, empty document,
+//                             pattern not found, or failure)
+//   replaceAll()   : true  -> at least one replacement made, count > 0
+//                    false -> nothing changed (the document is restored if a
+//                             failure happens midway), count == 0
+// ============================================================================
 
 #include "TextAlgorithms.h"
+#include "MyString.h"
 
 #include <new>
 
@@ -16,12 +50,12 @@ namespace
     // at or after `start`, or -1 if there is none.
     // Time: O(n * m) worst case, Space: O(1)
     int findInLine(
-        const std::string& line,
-        const std::string& pattern,
+        const MyString& line,
+        const MyString& pattern,
         int start)
     {
-        const int n = static_cast<int>(line.length());
-        const int m = static_cast<int>(pattern.length());
+        const int n = line.length();
+        const int m = pattern.length();
 
         if (m == 0 || start < 0)
         {
@@ -49,11 +83,11 @@ namespace
     // Counts non-overlapping matches in a line, stopping at `limit`
     // (pass a negative limit for "no limit").
     int countMatches(
-        const std::string& line,
-        const std::string& pattern,
+        const MyString& line,
+        const MyString& pattern,
         int limit)
     {
-        const int m = static_cast<int>(pattern.length());
+        const int m = pattern.length();
         int count = 0;
         int from = 0;
 
@@ -73,18 +107,27 @@ namespace
         return count;
     }
 
-    
+    // Builds a copy of `line` in which the first `maxReplacements`
+    // non-overlapping occurrences of `pattern` are replaced (negative =
+    // all occurrences). The replacement text is never rescanned.
+    //
+    // The result is assembled in a manually allocated char buffer using
+    // plain loops, then stored into `result`.
+    // `replaced` receives the number of replacements made.
+    // Returns false only on memory failure.
+    // Time: O(n * m + n + k * r)  (k matches, r replacement length)
+    // Space: O(n + k * r)
     bool buildReplacedLine(
-        const std::string& line,
-        const std::string& pattern,
-        const std::string& replacement,
+        const MyString& line,
+        const MyString& pattern,
+        const MyString& replacement,
         int maxReplacements,
-        std::string& result,
+        MyString& result,
         int& replaced)
     {
-        const int n = static_cast<int>(line.length());
-        const int m = static_cast<int>(pattern.length());
-        const int r = static_cast<int>(replacement.length());
+        const int n = line.length();
+        const int m = pattern.length();
+        const int r = replacement.length();
 
         replaced = countMatches(line, pattern, maxReplacements);
 
@@ -133,7 +176,7 @@ namespace
 
         try
         {
-            result = std::string(buffer, static_cast<std::size_t>(dst));
+            result = MyString(buffer);
         }
         catch (...)
         {
@@ -246,7 +289,7 @@ void MatchArray::clear()
 // Space: O(k) for k matches
 bool TextAlgorithms::findAll(
     const Document& document,
-    const std::string& pattern,
+    const MyString& pattern,
     MatchArray& results)
 {
     results.clear();
@@ -265,7 +308,7 @@ bool TextAlgorithms::findAll(
 
     for (int lineNumber = 1; lineNumber <= lineCount; ++lineNumber)
     {
-        std::string line;
+        MyString line;
 
         if (!document.getLine(lineNumber, line))
         {
@@ -307,10 +350,10 @@ bool TextAlgorithms::findAll(
 // Time: O(L * n * m) plus O(L^2) list traversal, Space: O(n)
 bool TextAlgorithms::replaceFirst(
     Document& document,
-    const std::string& pattern,
-    const std::string& replacement,
+    const MyString& pattern,
+    const MyString& replacement,
     MatchPosition& changedPosition,
-    std::string& originalText)
+    MyString& originalText)
 {
     if (pattern.length() == 0 || document.isEmpty())
     {
@@ -321,7 +364,7 @@ bool TextAlgorithms::replaceFirst(
 
     for (int lineNumber = 1; lineNumber <= lineCount; ++lineNumber)
     {
-        std::string line;
+        MyString line;
 
         if (!document.getLine(lineNumber, line))
         {
@@ -335,7 +378,7 @@ bool TextAlgorithms::replaceFirst(
             continue;   // no match on this line, try the next one
         }
 
-        std::string newLine;
+        MyString newLine;
         int replaced = 0;
 
         if (!buildReplacedLine(line, pattern, replacement, 1,
@@ -367,8 +410,8 @@ bool TextAlgorithms::replaceFirst(
 // Space: O(S) where S is the total size of the affected lines (backup)
 bool TextAlgorithms::replaceAll(
     Document& document,
-    const std::string& pattern,
-    const std::string& replacement,
+    const MyString& pattern,
+    const MyString& replacement,
     TextChangeArray& changes,
     int& replacementCount)
 {
@@ -388,7 +431,7 @@ bool TextAlgorithms::replaceAll(
 
     for (int lineNumber = 1; lineNumber <= lineCount; ++lineNumber)
     {
-        std::string line;
+        MyString line;
 
         if (!document.getLine(lineNumber, line))
         {
@@ -410,60 +453,60 @@ bool TextAlgorithms::replaceAll(
     }
 
     // ---------------- Phase 1.5: record changes for undo ----------------
-
-for (int lineNumber = 1; lineNumber <= lineCount; ++lineNumber)
-{
-    std::string line;
-
-    if (!document.getLine(lineNumber, line))
+    for (int lineNumber = 1; lineNumber <= lineCount; ++lineNumber)
     {
-        changes.clear();
-        return false;
-    }
+        MyString line;
 
-    int searchFrom = 0;
-
-    while (true)
-    {
-        int position = findInLine(line, pattern, searchFrom);
-
-        if (position < 0)
-        {
-            break;
-        }
-
-        TextChange change;
-        change.lineNumber = lineNumber;
-        change.position = position;
-        change.oldText = pattern;
-        change.newText = replacement;
-
-        if (!changes.add(change))
+        if (!document.getLine(lineNumber, line))
         {
             changes.clear();
             return false;
         }
 
-        // Skip the matched text to avoid overlapping replacements.
-        searchFrom = position + static_cast<int>(pattern.length());
-    }
-}
+        int searchFrom = 0;
 
-if (changes.getSize() != totalMatches)
-{
-    changes.clear();
-    return false;
-}
+        while (true)
+        {
+            const int position = findInLine(line, pattern, searchFrom);
+
+            if (position < 0)
+            {
+                break;
+            }
+
+            TextChange change;
+            change.lineNumber = lineNumber;
+            change.position = position;
+            change.oldText = pattern;
+            change.newText = replacement;
+
+            if (!changes.add(change))
+            {
+                changes.clear();
+                return false;
+            }
+
+            // Skip the matched text to avoid overlapping replacements.
+            searchFrom = position + pattern.length();
+        }
+    }
+
+    if (changes.getSize() != totalMatches)
+    {
+        changes.clear();
+        return false;
+    }
 
     // Backup of every line we are about to change (for rollback)
-    std::string* backupText = new (std::nothrow) std::string[affectedLines];
+    MyString* backupText = new (std::nothrow) MyString[affectedLines];
     int* backupLine = new (std::nothrow) int[affectedLines];
 
     if (backupText == nullptr || backupLine == nullptr)
     {
         delete[] backupText;
         delete[] backupLine;
-        return false;   // memory failure, document untouched
+        changes.clear();    // nothing was changed, so nothing to undo
+        return false;       // memory failure, document untouched
     }
 
     // ---------------- Phase 2: apply ----------------
@@ -472,7 +515,7 @@ if (changes.getSize() != totalMatches)
 
     for (int lineNumber = 1; lineNumber <= lineCount && !failed; ++lineNumber)
     {
-        std::string line;
+        MyString line;
 
         if (!document.getLine(lineNumber, line))
         {
@@ -485,7 +528,7 @@ if (changes.getSize() != totalMatches)
             continue;   // line unaffected
         }
 
-        std::string newLine;
+        MyString newLine;
         int replaced = 0;
 
         if (!buildReplacedLine(line, pattern, replacement, -1,
@@ -516,6 +559,7 @@ if (changes.getSize() != totalMatches)
 
         delete[] backupText;
         delete[] backupLine;
+        changes.clear();    // document was rolled back, so nothing to undo
         return false;
     }
 
