@@ -1,7 +1,8 @@
+
 #ifndef UNDOSTACK_H
 #define UNDOSTACK_H
 
-#include <string>
+#include "Mystring.h"
 
 enum class OperationType
 {
@@ -18,8 +19,8 @@ struct TextChange
     int lineNumber;
     int position;
 
-    std::string oldText;
-    std::string newText;
+    MyString oldText;
+    MyString newText;
 };
 
 class TextChangeArray
@@ -35,7 +36,6 @@ public:
     TextChangeArray();
     ~TextChangeArray();
 
-    // Required because UndoRecord owns a collection of changes.
     TextChangeArray(const TextChangeArray& other);
 
     TextChangeArray& operator=(
@@ -63,8 +63,8 @@ struct UndoRecord
     int lineNumber;
     int position;
 
-    std::string oldText;
-    std::string newText;
+    MyString oldText;
+    MyString newText;
 
     TextChangeArray changes;
 
@@ -96,19 +96,14 @@ public:
 
     int getSize() const;
 
-    // Add a record. Allocation failures may throw.
     void push(const UndoRecord& record);
 
-    // Read the top record without removing it.
     bool peek(UndoRecord& result) const;
 
-    // Remove the top record after its operation is reversed.
     bool discardTop();
 
-    // Retrieve and remove the top record.
     bool pop(UndoRecord& result);
 
-    // Remove all records.
     void clear();
 };
 

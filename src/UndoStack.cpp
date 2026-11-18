@@ -2,7 +2,6 @@
 #include "UndoStack.h"
 #include <limits>
 
-
 // TextChangeArray
 
 TextChangeArray::TextChangeArray()
@@ -181,10 +180,7 @@ void TextChangeArray::clear()
     size = 0;
 }
 
-
-// ==========================================
 // UndoRecord
-// ==========================================
 
 UndoRecord::UndoRecord()
     : type(OperationType::INSERT_TEXT),
@@ -196,10 +192,7 @@ UndoRecord::UndoRecord()
 {
 }
 
-
-// ==========================================
 // UndoStack Node
-// ==========================================
 
 UndoStack::UndoNode::UndoNode(
     const UndoRecord& undoRecord)
@@ -207,10 +200,7 @@ UndoStack::UndoNode::UndoNode(
 {
 }
 
-
-// ==========================================
 // UndoStack
-// ==========================================
 
 UndoStack::UndoStack()
     : top(nullptr), size(0)
