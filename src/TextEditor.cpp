@@ -254,6 +254,7 @@ void TextEditor::exitEditor()
 // Insert text
 // ============================================================
 
+
 void TextEditor::insertText()
 {
     int lineNumber;
@@ -280,20 +281,25 @@ void TextEditor::insertText()
     record.position = position;
     record.newText = text;
 
+    bool recordPushed = false;
+
     try
     {
         undoStack.push(record);
+        recordPushed = true;
 
         if (!document.insertText(lineNumber, position, text))
         {
             undoStack.discardTop();
+            recordPushed = false;
+
             menu.displayError("Invalid line or character position.");
             return;
         }
     }
     catch (const std::exception& e)
     {
-        if (!undoStack.isEmpty())
+        if (recordPushed)
         {
             undoStack.discardTop();
         }
@@ -307,9 +313,6 @@ void TextEditor::insertText()
     menu.displayMessage("Text inserted successfully.");
 }
 
-// ============================================================
-// Delete text
-// ============================================================
 
 void TextEditor::deleteText()
 {
@@ -325,15 +328,12 @@ void TextEditor::deleteText()
         return;
     }
 
-    std::string deletedText;
-
     if (length <= 0)
     {
         menu.displayError("Length must be positive.");
         return;
     }
 
-    // Read the original text first so the undo record is prepared.
     std::string line;
 
     if (!document.getLine(lineNumber, line) ||
@@ -351,7 +351,7 @@ void TextEditor::deleteText()
         actualLength = static_cast<int>(line.length()) - position;
     }
 
-    deletedText = line.substr(position, actualLength);
+    std::string deletedText = line.substr(position, actualLength);
 
     UndoRecord record;
     record.type = OperationType::DELETE_TEXT;
@@ -359,9 +359,12 @@ void TextEditor::deleteText()
     record.position = position;
     record.oldText = deletedText;
 
+    bool recordPushed = false;
+
     try
     {
         undoStack.push(record);
+        recordPushed = true;
 
         if (!document.deleteText(
                 lineNumber,
@@ -370,13 +373,15 @@ void TextEditor::deleteText()
                 deletedText))
         {
             undoStack.discardTop();
+            recordPushed = false;
+
             menu.displayError("Text deletion failed.");
             return;
         }
     }
     catch (const std::exception& e)
     {
-        if (!undoStack.isEmpty())
+        if (recordPushed)
         {
             undoStack.discardTop();
         }
@@ -388,108 +393,6 @@ void TextEditor::deleteText()
     }
 
     menu.displayMessage("Text deleted successfully.");
-}
-
-// ============================================================
-// Insert line
-// ============================================================
-
-void TextEditor::insertLine()
-{
-    int lineNumber;
-    std::string text;
-
-    if (!menu.getInteger("Enter line number: ", lineNumber) ||
-        !menu.getString("Enter line text: ", text))
-    {
-        menu.displayError("Input cancelled.");
-        return;
-    }
-
-    UndoRecord record;
-    record.type = OperationType::INSERT_LINE;
-    record.lineNumber = lineNumber;
-    record.newText = text;
-
-    try
-    {
-        undoStack.push(record);
-
-        if (!document.insertLine(lineNumber, text))
-        {
-            undoStack.discardTop();
-            menu.displayError("Invalid line number.");
-            return;
-        }
-    }
-    catch (const std::exception& e)
-    {
-        if (!undoStack.isEmpty())
-        {
-            undoStack.discardTop();
-        }
-
-        menu.displayError(
-            std::string("Line insertion failed: ") + e.what()
-        );
-        return;
-    }
-
-    menu.displayMessage("Line inserted successfully.");
-}
-
-// ============================================================
-// Delete line
-// ============================================================
-
-void TextEditor::deleteLine()
-{
-    int lineNumber;
-
-    if (!menu.getInteger("Enter line number to delete: ", lineNumber))
-    {
-        menu.displayError("Input cancelled.");
-        return;
-    }
-
-    std::string deletedLine;
-
-    if (!document.getLine(lineNumber, deletedLine))
-    {
-        menu.displayError("Invalid line number.");
-        return;
-    }
-
-    UndoRecord record;
-    record.type = OperationType::DELETE_LINE;
-    record.lineNumber = lineNumber;
-    record.oldText = deletedLine;
-
-    try
-    {
-        undoStack.push(record);
-
-        if (!document.deleteLine(lineNumber))
-        {
-            undoStack.discardTop();
-            menu.displayError("Line deletion failed.");
-            return;
-        }
-    }
-    catch (const std::exception& e)
-    {
-        if (!undoStack.isEmpty())
-        {
-            undoStack.discardTop();
-        }
-
-        menu.displayError(
-            std::string("Line deletion failed: ") + e.what()
-        );
-        return;
-    }
-
-    menu.displayMessage("Line deleted successfully.");
 }
 
 // ============================================================
@@ -755,7 +658,7 @@ void TextEditor::undo()
 
         break;
     }
-
+    
     // --------------------------------------------------------
     // Undo Replace All
     // --------------------------------------------------------
@@ -773,6 +676,32 @@ void TextEditor::undo()
                 break;
             }
 
+            long long adjustedPosition = change.position;
+
+            // Calculate position shifts caused by earlier replacements
+            for (int j = 0; j < i; ++j)
+            {
+                TextChange earlierChange;
+
+                if (!record.changes.get(j, earlierChange))
+                {
+                    success = false;
+                    break;
+                }
+
+                if (earlierChange.lineNumber == change.lineNumber)
+                {
+                    adjustedPosition +=
+                        static_cast<long long>(earlierChange.newText.length()) -
+                        static_cast<long long>(earlierChange.oldText.length());
+                }
+            }
+
+            if (!success)
+            {
+                break;
+            }
+
             std::string line;
 
             if (!document.getLine(change.lineNumber, line))
@@ -781,13 +710,12 @@ void TextEditor::undo()
                 break;
             }
 
-            int position = change.position;
-            int replacementLength =
-                static_cast<int>(change.newText.length());
+            long long replacementLength =
+                static_cast<long long>(change.newText.length());
 
-            if (position < 0 ||
-                position + replacementLength >
-                    static_cast<int>(line.length()))
+            if (adjustedPosition < 0 ||
+                adjustedPosition + replacementLength >
+                    static_cast<long long>(line.length()))
             {
                 success = false;
                 break;
@@ -795,11 +723,15 @@ void TextEditor::undo()
 
             std::string restored;
 
-            restored.append(line, 0, position);
+            restored.append(
+                line, 0, static_cast<std::size_t>(adjustedPosition)
+            );
+
             restored.append(change.oldText);
+
             restored.append(
                 line,
-                position + replacementLength,
+                static_cast<std::size_t>(adjustedPosition + replacementLength),
                 std::string::npos
             );
 

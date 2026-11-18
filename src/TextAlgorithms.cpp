@@ -1,37 +1,4 @@
-// ============================================================================
-// TextAlgorithms.cpp
-// CS-218 Data Structures and Algorithms - Text Editor (CEP)
-//
-// Implements:
-//   - MatchArray      : custom dynamic array for search results
-//   - TextAlgorithms  : findAll(), replaceFirst(), replaceAll()
-//
-// Library usage:
-//   No string library facilities are used for the algorithms. There is no
-//   <cstring>, no strlen/strcpy, and no std::string::find/substr/append/
-//   compare/etc. Searching, copying and building of lines are all written by
-//   hand with loops over characters. std::string appears only as the data
-//   type required by the Document interface, and only its length() and
-//   operator[] accessors are read here; new lines are built in a manually
-//   allocated char buffer and then handed to Document::updateLine().
-//
-// Project conventions followed:
-//   - Line numbers are 1-based, character positions are 0-based
-//   - Search is case-sensitive and works on individual lines
-//   - findAll() reports OVERLAPPING matches
-//   - replaceFirst()/replaceAll() work on NON-overlapping matches
-//   - Expected failures are reported through return values (no exceptions)
-//
-// Return value contract:
-//   findAll()      : true  -> search completed (results.getSize() may be 0)
-//                    false -> empty pattern, empty document, or memory failure
-//   replaceFirst() : true  -> exactly one replacement was made
-//                    false -> nothing changed (empty pattern, empty document,
-//                             pattern not found, or failure)
-//   replaceAll()   : true  -> at least one replacement made, count > 0
-//                    false -> nothing changed (the document is restored if a
-//                             failure happens midway), count == 0
-// ============================================================================
+
 
 #include "TextAlgorithms.h"
 
@@ -106,16 +73,7 @@ namespace
         return count;
     }
 
-    // Builds a copy of `line` in which the first `maxReplacements`
-    // non-overlapping occurrences of `pattern` are replaced (negative =
-    // all occurrences). The replacement text is never rescanned.
-    //
-    // The result is assembled in a manually allocated char buffer using
-    // plain loops, then stored into `result`.
-    // `replaced` receives the number of replacements made.
-    // Returns false only on memory failure.
-    // Time: O(n * m + n + k * r)  (k matches, r replacement length)
-    // Space: O(n + k * r)
+    
     bool buildReplacedLine(
         const std::string& line,
         const std::string& pattern,
