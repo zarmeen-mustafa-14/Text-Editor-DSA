@@ -1,7 +1,7 @@
 #ifndef MENU_H
 #define MENU_H
 
-#include <string>
+#include "MyString.h"
 
 class Menu
 {
@@ -13,26 +13,26 @@ public:
 
     // Command-specific input.
     bool getInteger(
-        const std::string& prompt,
+        const MyString& prompt,
         int& value
     ) const;
 
     bool getString(
-        const std::string& prompt,
-        std::string& value
+        const MyString& prompt,
+        MyString& value
     ) const;
 
     // Output.
     void displayMessage(
-        const std::string& message
+        const MyString& message
     ) const;
 
     void displayError(
-        const std::string& message
+        const MyString& message
     ) const;
 
     void displayDocument(
-        const std::string& text
+        const MyString& text
     ) const;
 
     void displayDocumentStatistics(
@@ -41,4 +41,4 @@ public:
     ) const;
 };
 
-#endif   
+#endif

@@ -1,4 +1,3 @@
-
 #include "Menu.h"
 
 #include <iostream>
@@ -47,7 +46,7 @@ bool Menu::getChoice(int& choice) const
 }
 
 // Reads an integer.
-bool Menu::getInteger(const string& prompt, int& value) const
+bool Menu::getInteger(const MyString& prompt, int& value) const
 {
     cout << prompt;
 
@@ -62,27 +61,28 @@ bool Menu::getInteger(const string& prompt, int& value) const
     return true;
 }
 
-// Reads a line of text.
-bool Menu::getString(const string& prompt, string& value) const
+// Reads a complete line of text using MyString.
+bool Menu::getString(const MyString& prompt, MyString& value) const
 {
     cout << prompt;
-    return static_cast<bool>(getline(cin, value));
+
+    return static_cast<bool>(getLine(cin, value));
 }
 
 // Displays a message.
-void Menu::displayMessage(const string& message) const
+void Menu::displayMessage(const MyString& message) const
 {
     cout << "\n" << message << "\n";
 }
 
 // Displays an error message.
-void Menu::displayError(const string& message) const
+void Menu::displayError(const MyString& message) const
 {
     cout << "\nError: " << message << "\n";
 }
 
 // Displays the document.
-void Menu::displayDocument(const string& text) const
+void Menu::displayDocument(const MyString& text) const
 {
     cout << "\n========== DOCUMENT ==========\n";
     cout << text;
