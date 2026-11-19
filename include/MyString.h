@@ -1,7 +1,8 @@
 #ifndef MYSTRING_H
 #define MYSTRING_H
 
-#include <iostream>   // std::istream / std::ostream (no <string> needed)
+#include <iostream>
+#include <stdexcept>   // std::istream / std::ostream (no <string> needed)
 
 class MyString
 {
@@ -66,7 +67,10 @@ std::ostream& operator<<(std::ostream& os, const MyString& s);
 std::istream& operator>>(std::istream& is, MyString& s);
 
 // getline equivalent (reads until '\n', discards the newline)
-std::istream& getLine(std::istream& is, MyString& s);
+// A '\r' directly before the '\n' (Windows line ending) is removed.
+// NUL bytes cannot be stored in a C-style buffer; they are dropped and, if
+// sawNul is given, *sawNul is set so callers can reject binary input.
+std::istream& getLine(std::istream& is, MyString& s, bool* sawNul = nullptr);
 
 // to_string equivalent for integers (used in TextEditor)
 MyString intToStr(int value);

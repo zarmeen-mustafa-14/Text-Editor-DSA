@@ -43,8 +43,14 @@ void MyString::ensureCapacity(int needed)
 {
     if (needed <= cap) return;
 
+    if (needed < 0) throw std::length_error("MyString: text too long");
+
     int newCap = (cap > 0) ? cap : 8;
-    while (newCap < needed) newCap *= 2;
+    while (newCap < needed)
+    {
+        if (newCap > 1073741823) newCap = needed;   // avoid int overflow
+        else                     newCap *= 2;
+    }
 
     char* newBuf = new char[newCap];
     if (len > 0) strcopy(newBuf, buffer);
@@ -104,9 +110,12 @@ MyString& MyString::operator=(const MyString& other)
     {
         if (cap < other.len + 1)
         {
+            // allocate first so *this stays valid if new[] throws
+            int newCap = (other.len + 1 > 8) ? (other.len + 1) : 8;
+            char* newBuf = new char[newCap];
             delete[] buffer;
-            cap = (other.len + 1 > 8) ? (other.len + 1) : 8;
-            buffer = new char[cap];
+            buffer = newBuf;
+            cap = newCap;
         }
         len = other.len;
         strcopy(buffer, other.buffer);
@@ -119,13 +128,30 @@ MyString& MyString::operator=(const char* text)
     int n = strleng(text);
     if (cap < n + 1)
     {
+        int newCap = (n + 1 > 8) ? (n + 1) : 8;
+        char* newBuf = new char[newCap];
+        if (text != nullptr) strcopy(newBuf, text);
+        else                 newBuf[0] = '\0';
         delete[] buffer;
-        cap = (n + 1 > 8) ? (n + 1) : 8;
-        buffer = new char[cap];
+        buffer = newBuf;
+        cap = newCap;
+        len = n;
+        return *this;
     }
+    // use memmove-safe copy in case text points inside our own buffer
+    if (text != nullptr)
+    {
+        if (text >= buffer && text < buffer + cap)
+        {
+            MyString tmp(text);
+            len = tmp.len;
+            strcopy(buffer, tmp.buffer);
+            return *this;
+        }
+        strcopy(buffer, text);
+    }
+    else buffer[0] = '\0';
     len = n;
-    if (text != nullptr) strcopy(buffer, text);
-    else                 buffer[0] = '\0';
     return *this;
 }
 
@@ -164,6 +190,13 @@ const char& MyString::operator[](int index) const
 void MyString::append(const MyString& other)
 {
     if (other.len == 0) return;
+    if (other.len > 2147483646 - len) throw std::length_error("MyString: text too long");
+    if (&other == this)
+    {
+        MyString copy(other);
+        append(copy);
+        return;
+    }
     ensureCapacity(len + other.len + 1);
     int i = 0;
     while (i < other.len)
@@ -180,6 +213,13 @@ void MyString::append(const char* text)
     if (text == nullptr) return;
     int n = strleng(text);
     if (n == 0) return;
+    if (n > 2147483646 - len) throw std::length_error("MyString: text too long");
+    if (text >= buffer && text < buffer + cap)
+    {
+        MyString copy(text);
+        append(copy);
+        return;
+    }
     ensureCapacity(len + n + 1);
     int i = 0;
     while (i < n)
@@ -196,6 +236,13 @@ void MyString::append(const MyString& other, int start, int count)
     if (start < 0 || start >= other.len || count <= 0) return;
     int avail = other.len - start;
     if (count > avail) count = avail;
+    if (count > 2147483646 - len) throw std::length_error("MyString: text too long");
+    if (&other == this)
+    {
+        MyString copy(other);
+        append(copy, start, count);
+        return;
+    }
 
     ensureCapacity(len + count + 1);
     int i = 0;
@@ -226,6 +273,13 @@ void MyString::insert(int position, const char* text)
     if (position < 0 || position > len) return;
     int n = strleng(text);
     if (n == 0) return;
+    if (n > 2147483646 - len) throw std::length_error("MyString: text too long");
+    if (text >= buffer && text < buffer + cap)
+    {
+        MyString copy(text);
+        insert(position, copy.c_str());
+        return;
+    }
 
     ensureCapacity(len + n + 1);
 
@@ -354,24 +408,38 @@ std::istream& operator>>(std::istream& is, MyString& s)
     return is;
 }
 
-std::istream& getLine(std::istream& is, MyString& s)
+std::istream& getLine(std::istream& is, MyString& s, bool* sawNul)
 {
     s.clear();
+    if (sawNul != nullptr) *sawNul = false;
+
     char c;
     char tmp[2] = { '\0', '\0' };
     bool any = false;
+    bool endedWithNewline = false;
+
     while (is.get(c))
     {
         any = true;
-        if (c == '\n') break;
-        if (c != '\r')
+        if (c == '\n') { endedWithNewline = true; break; }
+        if (c == '\0')
         {
-            tmp[0] = c;
-            s.append(tmp);
+            if (sawNul != nullptr) *sawNul = true;
+            continue;                       // cannot be stored in a C buffer
         }
+        tmp[0] = c;
+        s.append(tmp);
     }
+
+    // Strip the '\r' of a CRLF line ending (only when it is the last char).
+    if (s.length() > 0 && s[s.length() - 1] == '\r' &&
+        (endedWithNewline || is.eof()))
+    {
+        s.erase(s.length() - 1, 1);
+    }
+
     if (!any) is.setstate(std::ios::failbit);
-    else if (is.eof()) is.clear(std::ios::eofbit);  // last line had no '\n'
+    else if (!endedWithNewline && is.eof()) is.clear(std::ios::eofbit);  // last line had no '\n'
     return is;
 }
 
