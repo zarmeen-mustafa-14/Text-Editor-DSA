@@ -6,21 +6,6 @@
 
 **Understanding the mechanics of text editing through Data Structures and Algorithms.**
 
-<br>
-
-![C++](https://img.shields.io/badge/C++-17-00599C?style=for-the-badge\&logo=cplusplus\&logoColor=white)
-![CMake](https://img.shields.io/badge/CMake-Build_System-064F8C?style=for-the-badge\&logo=cmake\&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Cross--Platform-6C5CE7?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-In_Development-E67E22?style=for-the-badge)
-
-<br>
-
-*A closer look at what happens behind every keystroke.*
-
-<br>
-
----
-
 </div>
 
 ## ◈ 01 — The Project
@@ -29,34 +14,32 @@ What happens when you insert a character, search for a word, replace text, or un
 
 A text editor may appear simple on the surface, but behind every operation lies a combination of data structures, algorithms, memory management, and file handling.
 
-**Text Editor** is a console-based application developed in C++ that explores these underlying mechanisms through manually implemented data structures and algorithms.
+**Text Editor** is a console-based application written in C++ that explores these mechanisms through manually implemented components. Instead of relying on ready-made containers and `std::string`, the project builds its foundation from:
 
-Instead of relying on ready-made containers for its core functionality, the project builds its foundation using a custom singly linked list, a linked-list stack, and resizable dynamic arrays.
+* a custom **singly linked list** for document storage,
+* a custom **linked-list stack** for undo history,
+* custom **resizable dynamic arrays** for search results and replacement records,
+* a custom **`MyString`** class built on a raw, null-terminated character array.
 
-The objective is to understand not only how a text editor works, but also how its individual components interact to produce a functional application.
+The objective is to understand not only how a text editor works, but how its components interact to produce a reliable application, including how it fails safely when something goes wrong.
 
 ---
 
 ## ✦ 02 — Features
 
-The editor is designed around the following capabilities:
-
-|     | Feature                 | Description                                                      |
-| :-: | :---------------------- | :--------------------------------------------------------------- |
-|  📄 | **Document Management** | Create, open, save, and save documents under new filenames.      |
-|  ✏️ | **Text Editing**        | Insert and delete characters and entire lines.                   |
-|  🔎 | **Pattern Searching**   | Find occurrences of a pattern and display their locations.       |
-|  🔄 | **Text Replacement**    | Replace the first occurrence or all non-overlapping occurrences. |
-|  ↩️ | **Undo System**         | Reverse previous editing operations using a custom stack.        |
-|  📊 | **Document Statistics** | Calculate line count, character count, and word count.           |
-|  ⚙️ | **File Handling**       | Read from and write to text files.                               |
-| 🛡️ | **Error Handling**      | Handle invalid operations, input errors, and file failures.      |
+|     | Feature                 | Description                                                                          |
+| :-: | :---------------------- | :----------------------------------------------------------------------------------- |
+|  📄 | **Document Management** | New, open, save, save as, close, and delete files.                                   |
+|  ✏️ | **Text Editing**        | Insert and delete text at any character position; insert and delete whole lines.     |
+|  🧩 | **Write-Anywhere Edits**| Inserting past the end creates missing lines and pads with spaces (with safety caps).|
+|  🔎 | **Pattern Searching**   | Lists every match with its line number and character position.                       |
+|  🔄 | **Text Replacement**    | Replace the first occurrence or all non-overlapping occurrences.                     |
+|  ↩️ | **Undo System**         | Multi-step undo for every edit, including Replace All as a single step.              |
+|  📊 | **Document Statistics** | Line, word, and character counts.                                                    |
+|  🛡️ | **Safe File Handling**  | Atomic saves, binary-file rejection, and filename validation.                        |
+|  ⚙️ | **Error Handling**      | Strict input parsing, bounds checks, and rollback on failed operations.              |
 
 ---
-
-## ⌘ 03 — The Architecture
-
-The project follows a modular, class-based architecture. Each component has a defined responsibility, keeping document storage, algorithms, file handling, user interaction, and application control independent.
 
 ### System Architecture
 
@@ -71,12 +54,18 @@ flowchart TD
     B --> G["FileManager"]
 
     F --> C
-    F --> D
     G --> C
 
     C --> H["Singly Linked List"]
     D --> I["Linked-List Stack"]
-    F --> J["Dynamic Arrays"]
+    D --> K["TextChangeArray"]
+    F --> J["MatchArray"]
+
+    C -.-> M["MyString"]
+    D -.-> M
+    F -.-> M
+    G -.-> M
+    E -.-> M
 
     style A fill:#172554,color:#fff,stroke:#60A5FA
     style B fill:#1E3A5F,color:#fff,stroke:#60A5FA
@@ -85,36 +74,46 @@ flowchart TD
     style E fill:#713F12,color:#fff,stroke:#FACC15
     style F fill:#164E63,color:#fff,stroke:#67E8F9
     style G fill:#374151,color:#fff,stroke:#D1D5DB
+    style M fill:#7F1D1D,color:#fff,stroke:#FCA5A5
 ```
+
+*Dotted lines show that every module represents text with `MyString`.*
 
 ### Module Breakdown
 
-| Module           | Responsibility                                                          |
-| :--------------- | :---------------------------------------------------------------------- |
-| `Document`       | Owns and manages the document's linked-list representation.             |
-| `UndoStack`      | Maintains editing history and manages undo records.                     |
-| `TextAlgorithms` | Implements manual searching and text replacement algorithms.            |
-| `FileManager`    | Handles document reading and writing.                                   |
-| `Menu`           | Collects console input and displays information.                        |
-| `TextEditor`     | Coordinates application operations and communicates with other modules. |
-| `main.cpp`       | Initializes and launches the application.                               |
+| Module           | Responsibility                                                                                     |
+| :--------------- | :------------------------------------------------------------------------------------------------- |
+| `MyString`       | Manual string class: dynamic buffer, append, insert, erase, substring, comparison, stream I/O.     |
+| `Document`       | Owns the linked list of lines; line and character editing; statistics; safe iteration.             |
+| `UndoStack`      | Linked-list stack of `UndoRecord`s, plus the `TextChangeArray` used to reverse Replace All.        |
+| `TextAlgorithms` | Naive pattern matching, Find All, Replace First, Replace All, and the `MatchArray` result store.   |
+| `FileManager`    | Opening, saving, deleting, filename normalization and validation.                                  |
+| `Menu`           | Hierarchical console interface, strict input helpers, and all output formatting.                   |
+| `TextEditor`     | Central controller: connects menus, document, algorithms, file operations, and undo.               |
+| `main.cpp`       | Creates the editor and catches any fatal exception.                                                |
+
+### Application Flow
+
+1. `main.cpp` creates a `TextEditor` and calls `run()`.
+2. `Menu` shows the main menu and reads a choice.
+3. `TextEditor` routes it to a sub-menu (File, Edit, Find & Replace, View) and calls the relevant module.
+4. Every successful edit pushes an `UndoRecord` onto `UndoStack`.
+5. The result is displayed and control returns to the menu until the user exits.
 
 ---
 
 ## 🧠 04 — Data Structures: Under the Hood
 
-The core of this project is built around three manually implemented data structures.
-
 ### 01 / Singly Linked List
 
 **Purpose: Document Storage**
 
-The document is represented as a sequence of dynamically allocated nodes. Each node stores one line of text and a pointer to the next node.
+Each node holds one line (a `MyString`) and a pointer to the next node. The list keeps both a `head` and a `tail` pointer, so appending a line is O(1).
 
 ```text
- HEAD
-  |
-  v
+ HEAD                                                          TAIL
+  |                                                              |
+  v                                                              v
 +----------------+     +----------------+     +----------------+
 |    Line 01     |     |    Line 02     |     |    Line 03     |
 |  "Hello World" | --> |  "Text Editor" | --> |  "C++ Project" | --> NULL
@@ -123,16 +122,21 @@ The document is represented as a sequence of dynamically allocated nodes. Each n
 
 **Why a linked list?**
 
-* Dynamic memory allocation.
 * No fixed document size.
-* Efficient insertion and deletion of nodes once their positions are reached.
-* Direct application of pointer manipulation and memory management concepts.
+* Inserting or deleting a line never shifts the lines after it.
+* A direct application of pointer manipulation and manual memory management.
+
+**Worth knowing:**
+
+* `LineIterator` walks the list one node per step. Looping with `getLine(i)` would cost O(L²), so display and counting use the iterator instead.
+* `swap()` exchanges two documents without copying nodes, which is what makes "load into a temporary document, then commit" cheap.
+* Copying is deleted to prevent two documents from owning the same nodes.
 
 ### 02 / Linked-List Stack
 
 **Purpose: Undo History**
 
-Each successful editing operation generates an undo record. These records are stored in a custom stack following the Last In, First Out (LIFO) principle.
+Each successful edit creates an `UndoRecord` (operation type, line, position, old text, new text, and any extra data) that is pushed onto the stack.
 
 ```text
              TOP
@@ -155,127 +159,158 @@ Each successful editing operation generates an undo record. These records are st
              NULL
 ```
 
+Operations tracked: `INSERT_TEXT`, `DELETE_TEXT`, `REPLACE_TEXT`, `REPLACE_ALL`, `INSERT_LINE`, `DELETE_LINE`.
+
 **Why a stack?**
 
-* Naturally follows the order required by Undo.
-* Constant-time push and pop operations.
-* Demonstrates a stack implemented without `std::stack`.
+* LIFO matches undo exactly: the newest change is reversed first.
+* O(1) push and pop, with no `std::stack`.
+* `peek` + `discardTop` lets the editor remove a record only *after* the undo succeeds, so a failed undo keeps its record.
 
 ### 03 / Dynamic Arrays
 
 **Purpose: Search Results & Replacement History**
 
-Two custom resizable arrays are used for different purposes:
+| Array             | Stores                                           | Purpose                                      |
+| :---------------- | :----------------------------------------------- | :------------------------------------------- |
+| `MatchArray`      | Line number and character position of each match | Holds Find All results.                      |
+| `TextChangeArray` | Line, position, old text, and new text           | Holds every change needed to reverse a Replace All. |
 
-| Array             | Stores                                         | Purpose                                       |
-| :---------------- | :--------------------------------------------- | :-------------------------------------------- |
-| `MatchArray`      | Line numbers and character positions           | Stores search results.                        |
-| `TextChangeArray` | Original text, replacement text, and positions | Stores changes needed to reverse Replace All. |
+Both start small and **double** their capacity when full, giving amortized O(1) insertion and O(1) indexed access.
 
-The arrays expand as additional elements are inserted, avoiding the limitations of a fixed-size array.
+### 04 / MyString
+
+**Purpose: Manual String Management**
+
+A dynamically allocated, null-terminated `char` array with three members: the buffer, the current length, and the allocated capacity. Capacity doubles on demand, which keeps repeated appends cheap. Even `strlen`, `strcpy`, and `strcmp` are rewritten by hand, with no `<cstring>`.
 
 ---
 
 ## 🔍 05 — Algorithms
 
-The editor implements its own text-processing algorithms.
-
-| Algorithm              | Description                                              |
-| :--------------------- | :------------------------------------------------------- |
-| Naive Pattern Matching | Searches for a pattern by comparing characters directly. |
-| Find All               | Locates every occurrence of a pattern in the document.   |
-| Replace First          | Replaces the first matching occurrence.                  |
-| Replace All            | Replaces all non-overlapping occurrences.                |
-| Undo                   | Reverses an operation using its stored undo record.      |
+| Algorithm              | Description                                                                 |
+| :--------------------- | :-------------------------------------------------------------------------- |
+| Naive Pattern Matching | Compares the pattern against each position of a line, character by character. |
+| Find All               | Applies matching to every line and records each hit in `MatchArray`.        |
+| Replace First          | Replaces the first occurrence only.                                         |
+| Replace All            | Replaces all non-overlapping occurrences, recording each change.            |
+| Undo                   | Pops the latest record and applies the reverse operation.                   |
+| Safe Save              | Writes to `<file>.tmp`, then replaces the target.                           |
 
 ### Search Behaviour
 
-The search algorithm is designed to:
+* Case-sensitive matching, one line at a time.
+* Line numbers start at **1**; character positions start at **0**.
+* **Find All reports overlapping matches** (searching `aa` in `aaa` gives positions 0 and 1).
+* Empty patterns are rejected.
 
-* Perform case-sensitive matching.
-* Search each line independently.
-* Report character positions using zero-based indexing.
-* Detect overlapping matches.
-* Reject empty search patterns.
+### Replace Behaviour
 
-### Replace All Behaviour
+* **Replace All uses non-overlapping matches**, and replacement text is never rescanned, so replacing `a` with `aa` cannot loop forever.
+* The new line is built in one pass, and the result length is checked against the `int` limit before building.
+* All replacements from one command form **a single undo step**, restored in reverse order.
+* If anything fails midway, the document is rolled back to its original state.
 
-Replace All uses non-overlapping matches and stores the original changes required for reversal.
+### Safety Behaviour
 
-All replacements from one Replace All command are grouped into a single undo operation.
+* **Padding limits:** inserting beyond the end of a document or line is allowed, but capped at 100,000 created lines and 10,000 padding spaces, so a typo like line `999999999` cannot exhaust memory.
+* **Atomic open:** a file is loaded into a temporary `Document` and swapped in only after a fully successful read.
+* **Binary files** (containing NUL bytes) are rejected on open.
+* **Windows line endings** (`\r\n`) are handled on read; files are saved with `\n`, so a file round-trips exactly.
+* **Filenames** are validated (no empty names, control characters, or `< > " | ? *`), and quotes from Windows "Copy as path" are stripped.
+* **Unsaved changes:** closing, opening, or exiting asks for confirmation first.
+* **End of input** (Ctrl+D / Ctrl+Z) is handled gracefully instead of looping.
 
 ---
 
-## 📁 06 — Project Structure
+## 🖥️ 06 — Using the Editor
+
+The interface is a hierarchical menu. `0` always goes back.
+
+```text
+=================== TEXT EDITOR ====================
+ File : a.txt  [modified]
+ Lines: 3    Words: 17
+--------------------------------------------------------
+  1. File             new, open, save, delete, close
+  2. Edit             text, lines, undo, save
+  3. Find & Replace   search and replace text
+  4. View             show document and statistics
+  5. Help
+  0. Exit
+--------------------------------------------------------
+```
+
+| Menu               | Options                                                                    |
+| :----------------- | :------------------------------------------------------------------------- |
+| **File**           | New · Open · Save · Save As · Delete a File · Close                        |
+| **Edit**           | Insert Text · Delete Text · Insert Line · Delete Line · Undo · Save        |
+| **Find & Replace** | Find Text · Replace First · Replace All                                    |
+| **View**           | Show Document & Statistics                                                 |
+| **Help**           | Navigation, numbering conventions, and behaviour notes                     |
+
+**Good to know**
+
+* Character positions count **bytes**, so avoid the middle of multi-byte (non-English) characters.
+* The undo history is cleared when you open, create, or close a document.
+
+---
+
+## 📁 07 — Project Structure
 
 ```text
 Text-Editor-DSA/
 │
 ├── include/
-│   ├── TextEditor.h
-│   ├── Menu.h
+│   ├── MyString.h
 │   ├── Document.h
 │   ├── UndoStack.h
 │   ├── TextAlgorithms.h
-│   └── FileManager.h
+│   ├── FileManager.h
+│   ├── Menu.h
+│   └── TextEditor.h
 │
 ├── src/
 │   ├── main.cpp
-│   ├── TextEditor.cpp
-│   ├── Menu.cpp
+│   ├── MyString.cpp
 │   ├── Document.cpp
 │   ├── UndoStack.cpp
 │   ├── TextAlgorithms.cpp
-│   └── FileManager.cpp
+│   ├── FileManager.cpp
+│   ├── Menu.cpp
+│   └── TextEditor.cpp
 │
 ├── CMakeLists.txt
 ├── README.md
 └── LICENSE
 ```
 
-The project separates declarations from implementations:
-
-* `include/` contains class declarations and public interfaces.
-* `src/` contains the corresponding implementations and application entry point.
-
-CMake manages the compilation and linking of all source files.
+* `include/` holds class declarations and public interfaces.
+* `src/` holds the implementations and the entry point.
 
 ---
 
-## 🛠️ 07 — Development Environment Setup
+## 🛠️ 08 — Development Environment Setup
 
-The project uses **C++17 and CMake**.
-
-The recommended Windows development environment is:
+The project uses **C++17**. Any C++17 compiler works. The recommended Windows setup is:
 
 * Visual Studio Code
 * MSYS2 UCRT64
-* GCC
-* CMake
-* Ninja
-
-Other compatible C++17 development environments can also be used.
+* GCC, CMake, Ninja
 
 ### Step 1 — Install VS Code and MSYS2
 
-Download and install:
-
-* Visual Studio Code
-* MSYS2
+Download and install **Visual Studio Code** and **MSYS2**.
 
 ### Step 2 — Install the Required Tools
 
-Open the **MSYS2 UCRT64** terminal.
-
-Update the package database and installed packages:
+Open the **MSYS2 UCRT64** terminal and update:
 
 ```bash
 pacman -Syu
 ```
 
-If the terminal closes during the update, reopen UCRT64 and run the update command again if requested.
-
-Install the compiler and build tools:
+If the terminal closes during the update, reopen UCRT64 and run it again if requested. Then install the toolchain:
 
 ```bash
 pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
@@ -283,28 +318,15 @@ pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w
 
 ### Step 3 — Install VS Code Extensions
 
-Open VS Code and install:
-
-* **C/C++**
-* **CMake Tools**
+Install **C/C++** and **CMake Tools**.
 
 ### Step 4 — Configure the VS Code Terminal
 
-In VS Code:
-
 1. Press `Ctrl + Shift + P`.
 2. Select `Terminal: Select Default Profile`.
-3. Choose `bash (MSYS2)` if available.
-
-For the UCRT64 environment, ensure the terminal uses:
-
-```text
-MSYSTEM=UCRT64
-```
+3. Choose `bash (MSYS2)` if available, and make sure the terminal uses `MSYSTEM=UCRT64`.
 
 ### Step 5 — Verify Installation
-
-Open the VS Code integrated terminal and execute:
 
 ```bash
 g++ --version
@@ -312,13 +334,11 @@ cmake --version
 ninja --version
 ```
 
-If all three commands display version information, the development environment is ready.
+If all three print version information, the environment is ready.
 
 ---
 
-## 🚀 08 — Build & Run
-
-Once the development environment is configured, follow these steps.
+## 🚀 09 — Build & Run
 
 ### 01 / Clone the Repository
 
@@ -327,85 +347,130 @@ git clone <repository-url>
 cd Text-Editor-DSA
 ```
 
-### 02 / Configure CMake
+### 02 / Build with CMake
 
 ```bash
 cmake -S . -B build -G Ninja
-```
-
-### 03 / Build the Project
-
-```bash
 cmake --build build
 ```
 
-### 04 / Run the Application
-
-**Windows — MSYS2 UCRT64:**
+### 03 / Or Build Directly with g++
 
 ```bash
-./build/TextEditor.exe
+g++ -std=c++17 -Wall -Wextra -Iinclude src/*.cpp -o TextEditor
 ```
 
-The executable location may differ depending on the selected build generator and configuration.
+### 04 / Run
 
-> **Note:** Every team member should configure and build the project locally. The generated `build/` directory should not be committed to the repository.
+```bash
+./build/TextEditor.exe     # CMake build on Windows (MSYS2 UCRT64)
+./build/TextEditor         # CMake build on Linux / macOS
+./TextEditor               # direct g++ build
+```
 
----
+The executable location can differ depending on the generator and configuration.
 
-## ⏱️ 09 — Complexity Analysis
-
-The project also explores the computational cost of its fundamental operations.
-
-| Operation                        | Expected Time Complexity |
-| :------------------------------- | :----------------------: |
-| Access a line in the linked list |           O(L)           |
-| Insert a line                    |           O(L)           |
-| Delete a line                    |           O(L)           |
-| Insert text within a line        |           O(N)           |
-| Delete text within a line        |           O(N)           |
-| Push onto undo stack             |           O(1)           |
-| Pop from undo stack              |           O(1)           |
-| Access dynamic array element     |           O(1)           |
-| Append to dynamic array          |      Amortized O(1)      |
-| Naive pattern searching          |         O(N × M)         |
-
-**Notation:**
-
-* `L` — Number of lines in the document.
-* `N` — Number of characters in the searched text or line, as applicable.
-* `M` — Length of the search pattern.
-
-Actual operation costs may also include string copying, memory allocation, and replacement overhead.
-
-The final complexity analysis will be verified against the completed implementations.
+> **Note:** The generated `build/` directory should not be committed.
 
 ---
 
-## 🧪 10 — Testing & Validation
+## ⏱️ 10 — Complexity Analysis
 
-Testing will cover individual modules as well as the integration of the complete application.
+**Notation**
 
-Planned test cases include:
+| Symbol | Meaning                                  | Symbol | Meaning                              |
+| :----: | :--------------------------------------- | :----: | :----------------------------------- |
+|   `L`  | Number of document lines                 |   `R`  | Number of search matches             |
+|   `N`  | Total number of characters               |   `K`  | Number of replacement records        |
+|   `C`  | Length of the affected line or string    |   `H`  | Number of undo records               |
+|   `M`  | Length of the search pattern             |   `T`  | Length of inserted/replacement text  |
+|   `S`  | Total size of affected original lines    |   `U`  | Total size of rebuilt lines          |
+|   `P`  | Size of an undo record's stored text     |        |                                      |
 
-| Test Area           | What We Validate                                           |
-| :------------------ | :--------------------------------------------------------- |
-| Document Management | Empty documents, line insertion, deletion, and updating.   |
-| Text Editing        | Character insertion, deletion, and boundary positions.     |
-| Searching           | Multiple matches, overlapping matches, and no-match cases. |
-| Replacement         | First occurrence and Replace All behaviour.                |
-| Undo                | Reversal of different editing operations.                  |
-| File Handling       | Valid files, missing files, reading, and writing failures. |
-| Input Validation    | Invalid line numbers, positions, and malformed input.      |
-| Integration         | Correct interaction between all modules.                   |
+### Time Complexity
 
-Test results and screenshots will be added as implementation progresses.
+| Operation                         | Time                                |
+| :-------------------------------- | :---------------------------------- |
+| Insert line at beginning          | O(1) structural                     |
+| Append line at end                | O(C), including text copying        |
+| Insert line at a middle position  | O(L + C)                            |
+| Delete line                       | O(L)                                |
+| Update line                       | O(L + C)                            |
+| Character insertion               | O(L + C + T)                        |
+| Character deletion                | O(L + C)                            |
+| Display / count characters        | O(L + N)                            |
+| `MyString` character access       | O(1)                                |
+| `MyString` append                 | O(T)                                |
+| `MyString` insertion              | O(C + T)                            |
+| `MyString` deletion               | O(C)                                |
+| `MyString` comparison             | O(C)                                |
+| `MatchArray` access / insertion   | O(1) (insertion amortized)          |
+| `UndoStack` push / pop            | O(1) structural; O(P) with copying  |
+| Find All                          | O(N × M + L + R)                    |
+| Replace First                     | O(N × M + C + U)                    |
+| Replace All                       | O(N × M + S + U + R(M + T))         |
+| Open / Save file                  | O(N + L)                            |
+
+### Space Complexity
+
+| Structure / Operation | Space                         |
+| :-------------------- | :---------------------------- |
+| Document linked list  | O(N + L)                      |
+| `MyString`            | O(C) per string               |
+| `UndoStack`           | O(H + stored record data)     |
+| `MatchArray`          | O(R)                          |
+| `TextChangeArray`     | O(K × (M + T))                |
+| Find All              | O(R) additional               |
+| Replace All           | O(K × (M + T) + S + C + U)    |
+| Open file             | O(N + L) additional           |
+| Save file             | O(1) auxiliary, excluding stream buffers |
 
 ---
 
-## 👥 11 — Team Contributions
+## 🧪 11 — Testing & Validation
 
-Developed collaboratively as part of the CS-218 Data Structures and Algorithms course.
+The editor was tested by exercising every operation through the console menu, with both valid and invalid input.
+
+| Test Area           | What We Validate                                                   |
+| :------------------ | :----------------------------------------------------------------- |
+| Document Management | Empty documents, line insertion, deletion, and updating.           |
+| Text Editing        | Character insertion, deletion, boundary positions, padding.        |
+| Searching           | Multiple matches, overlapping matches, no-match cases.             |
+| Replacement         | First occurrence, Replace All, and undo of both.                   |
+| Undo                | Reversal of every operation type, and the empty-stack case.        |
+| File Handling       | Valid files, missing files, directories, save round-trips.         |
+| Input Validation    | Invalid line numbers, positions, empty patterns, malformed input.  |
+| Statistics          | Line, word, and character counts after edits.                      |
+
+Screenshots of the main menu, insertion, line deletion, undo, Replace All, statistics, and saving are included in the project report.
+
+### Known Limitations
+
+* Console interface only, and plain-text documents only.
+* Reaching a line requires linked-list traversal, which is O(L).
+* Naive pattern matching is O(N × M) and can be slow on very large documents.
+* `MyString` covers only the operations this project needs, and positions are byte-based.
+* Undo history is not persisted between sessions.
+
+### Possible Improvements
+
+* A graphical or full-screen terminal interface.
+* Faster searching (KMP or Boyer–Moore).
+* Redo support, and case-insensitive search.
+* Automated unit tests for each module.
+
+---
+
+## 👥 12 — Team Contributions
+
+Developed collaboratively for **CS-218 Data Structures and Algorithms**.
+
+**Group members**
+
+* Palak Bajaj (CS-25003)
+* Areeba Ali (CS-25006)
+* Zarmeen Mustafa (CS-25013)
+* Syeda Dua Fatima (CS-25015)
 
 | Member | Responsibilities                                                               |
 | :----: | :----------------------------------------------------------------------------- |
@@ -416,12 +481,14 @@ Developed collaboratively as part of the CS-218 Data Structures and Algorithms c
 
 ---
 
-## ◈ 12 — Project Information
+## ◈ 13 — Project Information
 
 |                      |                                                   |
 | :------------------- | :------------------------------------------------ |
 | **Project**          | Design and Implementation of a Text Editor in C++ |
 | **Course**           | CS-218 — Data Structures and Algorithms           |
+| **Instructor**       | Dr. Shahab Tahzeeb                                |
+| **Batch / Section**  | FE Batch 2025 · Section A                         |
 | **Institution**      | NED University of Engineering and Technology      |
 | **Language**         | C++17                                             |
 | **Build System**     | CMake                                             |
@@ -441,7 +508,7 @@ Developed collaboratively as part of the CS-218 Data Structures and Algorithms c
 
 <br>
 
-`C++`   ·   `Data Structures`   ·   `Algorithms`
+`C++`   ·   `Data Structures`   ·   `Algorithms`
 
 <br>
 
