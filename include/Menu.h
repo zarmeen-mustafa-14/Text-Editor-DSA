@@ -78,8 +78,5 @@ public:
     ) const;
 };
 
-<<<<<<< HEAD
+
 #endif
-=======
-#endif
->>>>>>> 3ebdde3 (Fixed every function that was causing any kind of issue)

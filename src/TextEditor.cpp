@@ -6,6 +6,26 @@
 #include <sstream>
 #include <string>
 
+namespace
+{
+    bool splitsUtf8Character(const MyString& line, int position)
+    {
+        if (position <= 0 || position >= line.length()) return false;
+        const unsigned char byte = static_cast<unsigned char>(line[position]);
+        return (byte & 0xC0) == 0x80;
+    }
+
+    void rollbackExtendedInsert(Document& document, int lineNumber,
+                               int position, int insertedLength,
+                               int originalLineCount)
+    {
+        MyString ignored;
+        document.deleteText(lineNumber, position, insertedLength, ignored);
+        while (document.getLineCount() > originalLineCount)
+            document.deleteLine(document.getLineCount());
+    }
+}
+
 TextEditor::TextEditor()
     : document(),
       undoStack(),
@@ -71,56 +91,150 @@ void TextEditor::handleMainChoice(int choice)
     }
 }
 
-void TextEditor::handleChoice(int choice)
+
+bool TextEditor::confirmDiscardChanges()
 {
-    switch (choice)
+    if (!modified) return true;
+    bool answer = false;
+    if (!menu.askYesNo("You have unsaved changes. Discard them?", answer))
+        return false;
+    return answer;
+}
+
+void TextEditor::fileMenu()
+{
+    while (running)
     {
-    case 1: newDocument(); break;
-    case 2: openDocument(); break;
-    case 3: saveDocument(); break;
-    case 4: saveDocumentAs(); break;
-    case 5: insertText(); break;
-    case 6: deleteText(); break;
-    case 7: insertLine(); break;
-    case 8: deleteLine(); break;
-    case 9: searchText(); break;
-    case 10: replaceText(); break;
-    case 11: replaceAllText(); break;
-    case 12: undo(); break;
-    case 13:
-    {
-        std::ostringstream output;
-        if (document.isEmpty())
+        menu.displayFileMenu(currentFilename, modified);
+        int choice = 0;
+        if (!menu.getChoice(choice)) { handleInputEnded(); return; }
+        switch (choice)
         {
-            output << "Document is empty.\n";
+        case 1: newDocument(); break;
+        case 2: openDocument(); break;
+        case 3: saveDocument(); break;
+        case 4: saveDocumentAs(); break;
+        case 5: deleteFile(); break;
+        case 6: closeDocument(); break;
+        case 0: return;
+        default: menu.displayError("Invalid menu choice."); break;
         }
-        else
+    }
+}
+
+void TextEditor::editMenu()
+{
+    while (running)
+    {
+        menu.displayEditMenu(undoStack.getSize());
+        int choice = 0;
+        if (!menu.getChoice(choice)) { handleInputEnded(); return; }
+        switch (choice)
         {
-            for (int i = 1; i <= document.getLineCount(); ++i)
+        case 1: insertText(); break;
+        case 2: deleteText(); break;
+        case 3: insertLine(); break;
+        case 4: deleteLine(); break;
+        case 5: undo(); break;
+        case 6: saveDocument(); break;
+        case 0: return;
+        default: menu.displayError("Invalid menu choice."); break;
+        }
+    }
+}
+
+void TextEditor::findMenu()
+{
+    while (running)
+    {
+        menu.displayFindMenu();
+        int choice = 0;
+        if (!menu.getChoice(choice)) { handleInputEnded(); return; }
+        switch (choice)
+        {
+        case 1: searchText(); break;
+        case 2: replaceText(); break;
+        case 3: replaceAllText(); break;
+        case 0: return;
+        default: menu.displayError("Invalid menu choice."); break;
+        }
+    }
+}
+
+void TextEditor::viewMenu()
+{
+    while (running)
+    {
+        menu.displayViewMenu();
+        int choice = 0;
+        if (!menu.getChoice(choice)) { handleInputEnded(); return; }
+        switch (choice)
+        {
+        case 1: showDocument(); break;
+        case 0: return;
+        default: menu.displayError("Invalid menu choice."); break;
+        }
+    }
+}
+
+void TextEditor::showDocument()
+{
+    MyString output;
+    if (document.isEmpty())
+    {
+        output.append("Document is empty.\n");
+    }
+    else
+    {
+        for (int i = 1; i <= document.getLineCount(); ++i)
+        {
+            MyString line;
+            if (document.getLine(i, line))
             {
-                std::string line;
-                if (document.getLine(i, line))
-                {
-                    output << i << ". " << line << '\n';
-                }
+                output.append(intToStr(i));
+                output.append(". ");
+                output.append(line);
+                output.append("\n");
             }
         }
-
-        menu.displayDocument(output.str());
-        menu.displayDocumentStatistics(
-            document.getLineCount(), document.getCharacterCount()
-        );
-        break;
     }
+    menu.displayDocument(output);
+    menu.displayDocumentStatistics(
+        document.getLineCount(), document.getWordCount(), document.getCharacterCount());
+}
 
-    bool answer = false;
-    if (!menu.askYesNo(
-            "You have unsaved changes. Discard them?", answer))
+void TextEditor::deleteFile()
+{
+    MyString filename;
+    if (!menu.getString("Enter filename to delete: ", filename) || filename.empty())
     {
-        return false;
+        menu.displayError("Input cancelled or filename is empty.");
+        return;
     }
+    bool confirm = false;
+    if (!menu.askYesNo("Delete this file permanently?", confirm) || !confirm)
+    {
+        menu.displayMessage("File deletion cancelled.");
+        return;
+    }
+    if (!FileManager::deleteFile(filename))
+        menu.displayError("Could not delete file.");
+    else
+        menu.displayMessage("File deleted.");
+}
 
-    return answer;
+void TextEditor::closeDocument()
+{
+    if (!confirmDiscardChanges())
+    {
+        menu.displayMessage("Close cancelled.");
+        return;
+    }
+    document.clear();
+    undoStack.clear();
+    currentFilename.clear();
+    modified = false;
+    menu.displayMessage("Document closed.");
 }
 
 void TextEditor::newDocument()
@@ -201,7 +315,9 @@ void TextEditor::openDocument()
     }
     catch (const std::exception& error)
     {
-        menu.displayError(std::string("Could not open file: ") + error.what());
+        MyString message("Could not open file: ");
+        message.append(error.what());
+        menu.displayError(message);
     }
 }
 
@@ -224,13 +340,15 @@ void TextEditor::saveDocument()
     }
     catch (const std::exception& error)
     {
-        menu.displayError(std::string("Could not save document: ") + error.what());
+        MyString message("Could not save document: ");
+        message.append(error.what());
+        menu.displayError(message);
     }
 }
 
 void TextEditor::saveDocumentAs()
 {
-    std::string filename;
+    MyString filename;
     if (!menu.getString("Enter filename to save as: ", filename))
     {
         menu.displayError("Input cancelled.");
@@ -254,7 +372,9 @@ void TextEditor::saveDocumentAs()
     }
     catch (const std::exception& error)
     {
-        menu.displayError(std::string("Could not save document: ") + error.what());
+        MyString message("Could not save document: ");
+        message.append(error.what());
+        menu.displayError(message);
     }
 }
 
@@ -302,12 +422,8 @@ void TextEditor::insertText()
     int position = 0;
     MyString text;
 
-    if (!menu.getInteger(
-            "Enter line number (1 or more, missing lines are created): ",
-            lineNumber) ||
-        !menu.getInteger(
-            "Enter character position (0 = start, past the end pads with spaces): ",
-            position) ||
+    if (!menu.getInteger("Enter line number (1 or more, missing lines are created): ", lineNumber) ||
+        !menu.getInteger("Enter character position (0 = start, past the end pads with spaces): ", position) ||
         !menu.getString("Enter text to insert: ", text))
     {
         menu.displayError("Invalid or cancelled input. Whole numbers are required.");
@@ -319,31 +435,23 @@ void TextEditor::insertText()
         return;
     }
 
+    MyString existing;
+    if (document.getLine(lineNumber, existing) && splitsUtf8Character(existing, position))
     {
-        MyString existing;
-        if (document.getLine(lineNumber, existing) &&
-            splitsUtf8Character(existing, position))
-        {
-            menu.displayError(
-                "That position is inside a multi-byte character "
-                "(positions are byte offsets). Choose a neighbouring position.");
-            return;
-        }
+        menu.displayError("That position is inside a multi-byte character (positions are byte offsets). Choose a neighbouring position.");
+        return;
     }
 
+    const int originalLineCount = document.getLineCount();
     int linesAdded = 0;
     int insertedAt = 0;
     MyString insertedText;
-
     try
     {
-        if (!document.insertTextExtending(
-                lineNumber, position, text,
-                linesAdded, insertedAt, insertedText))
+        if (!document.insertTextExtending(lineNumber, position, text,
+                                         linesAdded, insertedAt, insertedText))
         {
-            menu.displayError(
-                "Position is too far beyond the end of the document "
-                "(limit: 100000 new lines or 10000 padding spaces).");
+            menu.displayError("Invalid insertion position or padding limit exceeded.");
             return;
         }
 
@@ -354,52 +462,36 @@ void TextEditor::insertText()
         record.newText = insertedText;
         record.extraLines = linesAdded;
 
-    bool pushed = false;
-    try
-    {
-        // Record first: if allocation fails, the document remains unchanged.
-        undoStack.push(record);
-        pushed = true;
-
-        if (!document.insertText(lineNumber, position, text))
+        try
         {
-            // Could not record undo information: revert the insert.
-            removeInsertedText(
-                document, lineNumber, insertedAt,
-                insertedText.length(), linesAdded);
+            undoStack.push(record);
+        }
+        catch (...)
+        {
+            rollbackExtendedInsert(document, lineNumber, insertedAt,
+                                  insertedText.length(), originalLineCount);
             throw;
         }
     }
     catch (const std::exception& error)
     {
-        if (pushed) undoStack.discardTop();
-        menu.displayError(std::string("Insert failed: ") + error.what());
+        MyString message("Insert failed: ");
+        message.append(error.what());
+        menu.displayError(message);
         return;
     }
 
     modified = true;
-
-    MyString message("Text inserted successfully");
+    MyString message("Text inserted successfully.");
     const int paddingSpaces = insertedText.length() - text.length();
-
     if (linesAdded > 0 || paddingSpaces > 0)
     {
-        message.append(" (");
-        if (linesAdded > 0)
-        {
-            message.append(intToStr(linesAdded));
-            message.append(" new line(s) created");
-            if (paddingSpaces > 0) message.append(", ");
-        }
-        if (paddingSpaces > 0)
-        {
-            message.append(intToStr(paddingSpaces));
-            message.append(" padding space(s) added");
-        }
-        message.append(")");
+        message.append(" (created ");
+        message.append(intToStr(linesAdded));
+        message.append(" line(s), added ");
+        message.append(intToStr(paddingSpaces));
+        message.append(" padding space(s))");
     }
-
-    message.append(".");
     menu.displayMessage(message);
 }
 
@@ -476,68 +568,53 @@ void TextEditor::deleteText()
 void TextEditor::insertLine()
 {
     int lineNumber = 0;
-    std::string text;
+    MyString text;
     if (!menu.getInteger("Enter line number for insertion: ", lineNumber) ||
         !menu.getString("Enter line text: ", text))
     {
         menu.displayError("Invalid or cancelled input. A whole number is required.");
         return;
     }
-
     if (lineNumber < 1)
     {
         menu.displayError("Line number must be 1 or greater.");
         return;
     }
 
+    const int originalLineCount = document.getLineCount();
     int linesAdded = 0;
-
     try
     {
         if (!document.insertLineExtending(lineNumber, text, linesAdded))
         {
-            menu.displayError(
-                "Line number is too far beyond the end of the document "
-                "(limit: 100000 new lines).");
+            menu.displayError("Line number is too far beyond the end of the document.");
             return;
         }
-
         UndoRecord record;
         record.type = OperationType::INSERT_LINE;
         record.lineNumber = lineNumber;
         record.newText = text;
         record.extraLines = linesAdded;
-
-    bool pushed = false;
-    try
-    {
-        undoStack.push(record);
-        pushed = true;
-        if (!document.insertLine(lineNumber, text))
+        try
         {
-            undoStack.discardTop();
-            menu.displayError("Invalid line number. Valid range is 1 through line count + 1.");
-            return;
+            undoStack.push(record);
+        }
+        catch (...)
+        {
+            while (document.getLineCount() > originalLineCount)
+                document.deleteLine(document.getLineCount());
+            throw;
         }
     }
     catch (const std::exception& error)
     {
-        if (pushed) undoStack.discardTop();
-        menu.displayError(std::string("Line insertion failed: ") + error.what());
+        MyString message("Line insertion failed: ");
+        message.append(error.what());
+        menu.displayError(message);
         return;
     }
-
     modified = true;
-
-    MyString message("Line inserted successfully");
-    if (linesAdded > 1)
-    {
-        message.append(" (");
-        message.append(intToStr(linesAdded - 1));
-        message.append(" empty line(s) created before it)");
-    }
-    message.append(".");
-    menu.displayMessage(message);
+    menu.displayMessage("Line inserted successfully.");
 }
 
 void TextEditor::deleteLine()
@@ -800,21 +877,19 @@ void TextEditor::replaceAllText()
                     break;
                 }
 
-                std::string line;
+                MyString line;
                 if (!document.getLine(change.lineNumber, line) ||
-                    position + static_cast<long long>(change.newText.size()) >
-                        static_cast<long long>(line.size()))
+                    position + change.newText.length() > line.length())
                 {
                     rollbackSucceeded = false;
                     break;
                 }
 
-                std::string restored;
-                restored.append(line, 0, static_cast<std::size_t>(position));
+                MyString restored;
+                restored.append(line, 0, static_cast<int>(position));
                 restored.append(change.oldText);
-                restored.append(line,
-                    static_cast<std::size_t>(position + change.newText.size()),
-                    std::string::npos);
+                restored.append(line, static_cast<int>(position + change.newText.length()),
+                    line.length() - static_cast<int>(position + change.newText.length()));
                 if (!document.updateLine(change.lineNumber, restored))
                 {
                     rollbackSucceeded = false;
@@ -827,15 +902,23 @@ void TextEditor::replaceAllText()
             rollbackSucceeded = false;
         }
 
-        menu.displayError(
-            rollbackSucceeded
-                ? std::string("Replacement was rolled back because undo recording failed: ") + error.what()
-                : std::string("Critical error: undo recording failed and rollback was incomplete.")
-        );
+        MyString errorMessage;
+        if (rollbackSucceeded)
+        {
+            errorMessage = "Replacement was rolled back because undo recording failed: ";
+            errorMessage.append(error.what());
+        }
+        else
+        {
+            errorMessage = "Critical error: undo recording failed and rollback was incomplete.";
+        }
+        menu.displayError(errorMessage);
         return;
     }
 
-    menu.displayMessage("Total replacements: " + std::to_string(replacementCount));
+    MyString result("Total replacements: ");
+    result.append(intToStr(replacementCount));
+    menu.displayMessage(result);
 }
 
 void TextEditor::undo()
@@ -861,10 +944,18 @@ void TextEditor::undo()
         {
         case OperationType::INSERT_TEXT:
         {
-            std::string removed;
+            MyString removed;
             success = document.deleteText(
                 record.lineNumber, record.position,
-                static_cast<int>(record.newText.size()), removed);
+                record.newText.length(), removed);
+            if (success)
+            {
+                for (int i = 0; i < record.extraLines; ++i)
+                {
+                    success = document.deleteLine(record.lineNumber);
+                    if (!success) break;
+                }
+            }
             break;
         }
 
@@ -878,17 +969,16 @@ void TextEditor::undo()
 
         case OperationType::REPLACE_TEXT:
         {
-            std::string line;
+            MyString line;
             if (document.getLine(record.lineNumber, line) && record.position >= 0 &&
-                static_cast<std::size_t>(record.position) <= line.size() &&
-                record.newText.size() <= line.size() - static_cast<std::size_t>(record.position))
+                record.position <= line.length() &&
+                record.newText.length() <= line.length() - record.position)
             {
-                std::string restored;
-                restored.append(line, 0, static_cast<std::size_t>(record.position));
+                MyString restored;
+                restored.append(line, 0, record.position);
                 restored.append(record.oldText);
-                restored.append(line,
-                    static_cast<std::size_t>(record.position) + record.newText.size(),
-                    std::string::npos);
+                restored.append(line, record.position + record.newText.length(),
+                    line.length() - record.position - record.newText.length());
                 success = document.updateLine(record.lineNumber, restored);
             }
             break;
@@ -929,21 +1019,19 @@ void TextEditor::undo()
                     break;
                 }
 
-                std::string line;
+                MyString line;
                 if (!document.getLine(change.lineNumber, line) ||
-                    position + static_cast<long long>(change.newText.size()) >
-                        static_cast<long long>(line.size()))
+                    position + change.newText.length() > line.length())
                 {
                     success = false;
                     break;
                 }
 
-                std::string restored;
-                restored.append(line, 0, static_cast<std::size_t>(position));
+                MyString restored;
+                restored.append(line, 0, static_cast<int>(position));
                 restored.append(change.oldText);
-                restored.append(line,
-                    static_cast<std::size_t>(position + change.newText.size()),
-                    std::string::npos);
+                restored.append(line, static_cast<int>(position + change.newText.length()),
+                    line.length() - static_cast<int>(position + change.newText.length()));
                 if (!document.updateLine(change.lineNumber, restored))
                 {
                     success = false;
@@ -952,7 +1040,15 @@ void TextEditor::undo()
             break;
         }
         case OperationType::INSERT_LINE:
-            success = document.deleteLine(record.lineNumber);
+            success = true;
+            for (int i = 0; i < record.extraLines; ++i)
+            {
+                if (!document.deleteLine(record.lineNumber))
+                {
+                    success = false;
+                    break;
+                }
+            }
             break;
         case OperationType::DELETE_LINE:
             success = document.insertLine(record.lineNumber, record.oldText);

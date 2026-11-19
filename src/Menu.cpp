@@ -133,12 +133,8 @@ void Menu::displayFileMenu(const MyString& filename, bool modified) const
     cout << "Enter your choice: ";
 }
 
-<<<<<<< HEAD
-// Reads an integer.
-bool Menu::getInteger(const MyString& prompt, int& value) const
-=======
+
 void Menu::displayEditMenu(int undoCount) const
->>>>>>> 3ebdde3 (Fixed every function that was causing any kind of issue)
 {
     printTitle("EDIT");
     cout << " Text\n";
@@ -224,14 +220,7 @@ bool Menu::getChoice(int& choice) const
     return true;
 }
 
-<<<<<<< HEAD
-// Reads a complete line of text using MyString.
-bool Menu::getString(const MyString& prompt, MyString& value) const
-{
-    cout << prompt;
 
-    return static_cast<bool>(getLine(cin, value));
-=======
 // Reads an integer. Returns false on invalid input or end of input.
 bool Menu::getInteger(const MyString& prompt, int& value) const
 {
@@ -306,7 +295,6 @@ bool Menu::askYesNo(const MyString& prompt, bool& answer) const
 
         cout << "Please answer y or n.\n";
     }
->>>>>>> 3ebdde3 (Fixed every function that was causing any kind of issue)
 }
 
 // Displays a message.

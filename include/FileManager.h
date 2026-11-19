@@ -11,13 +11,7 @@
 class FileManager
 {
 public:
-<<<<<<< HEAD
-    // Loads into a temporary document and commits only after a successful read.
-    static bool openFile(const MyString& filename, Document& document);
 
-    // Writes the document using '\n' separators and no trailing newline.
-    static bool saveFile(const MyString& filename, const Document& document);
-=======
     // Trims surrounding whitespace and one pair of surrounding double quotes
     // (as produced by "Copy as path" on Windows).
     static MyString normalizeFilename(const MyString& filename);
@@ -41,7 +35,6 @@ public:
     // Deletes a file from disk. Returns false if the name is invalid, the file
     // does not exist, it is a directory, or the OS refuses to delete it.
     static bool deleteFile(const MyString& filename);
->>>>>>> 3ebdde3 (Fixed every function that was causing any kind of issue)
 };
 
 #endif // FILEMANAGER_H
