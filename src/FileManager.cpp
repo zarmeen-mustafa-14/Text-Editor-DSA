@@ -1,18 +1,17 @@
 #include "FileManager.h"
 
 #include <fstream>
-#include <string>
+#include <ios>
 
-bool FileManager::openFile(const std::string& filename, Document& document)
+bool FileManager::openFile(const MyString& filename, Document& document)
 {
     if (filename.empty())
     {
         return false;
     }
 
-    // Binary mode makes newline handling identical on Windows and POSIX.
-    // A temporary document ensures a failed read never damages the current one.
-    std::ifstream input(filename, std::ios::in | std::ios::binary);
+    // Binary mode keeps file handling consistent across operating systems.
+    std::ifstream input(filename.c_str(), std::ios::in | std::ios::binary);
     if (!input.is_open())
     {
         return false;
@@ -21,24 +20,18 @@ bool FileManager::openFile(const std::string& filename, Document& document)
     try
     {
         Document loadedDocument;
-        std::string line;
+        MyString line;
 
-        while (std::getline(input, line))
+        // Read each complete line directly into the project's MyString type.
+        while (getLine(input, line))
         {
-            // Normalize CRLF files to the editor's internal '\n' separator.
-            if (!line.empty() && line.back() == '\r')
-            {
-                line.pop_back();
-            }
-
             if (!loadedDocument.appendLine(line))
             {
                 return false;
             }
         }
 
-        // eofbit is expected after the final getline. badbit, or failbit
-        // without eofbit, indicates an actual read failure.
+        // A normal EOF is expected. Any other stream failure is an error.
         if (input.bad() || (input.fail() && !input.eof()))
         {
             return false;
@@ -49,22 +42,20 @@ bool FileManager::openFile(const std::string& filename, Document& document)
     }
     catch (...)
     {
-        // Allocation or string-copy failure leaves `document` untouched.
+        // The original document remains unchanged on failure.
         return false;
     }
 }
 
-bool FileManager::saveFile(const std::string& filename, const Document& document)
+bool FileManager::saveFile(const MyString& filename, const Document& document)
 {
     if (filename.empty())
     {
         return false;
     }
 
-    // Binary mode prevents platform-specific newline conversion. The file
-    // format uses one '\n' separator between lines and no trailing separator.
     std::ofstream output(
-        filename,
+        filename.c_str(),
         std::ios::out | std::ios::trunc | std::ios::binary
     );
 
@@ -79,14 +70,19 @@ bool FileManager::saveFile(const std::string& filename, const Document& document
 
         for (int lineNumber = 1; lineNumber <= lineCount; ++lineNumber)
         {
-            std::string line;
+            MyString line;
+
             if (!document.getLine(lineNumber, line))
             {
                 output.close();
                 return false;
             }
 
-            output.write(line.data(), static_cast<std::streamsize>(line.size()));
+            output.write(
+                line.c_str(),
+                static_cast<std::streamsize>(line.length())
+            );
+
             if (lineNumber < lineCount)
             {
                 output.put('\n');
