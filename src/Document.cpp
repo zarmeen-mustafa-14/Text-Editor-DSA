@@ -1,12 +1,11 @@
 #include "Document.h"
 
 #include <iostream>
-#include <sstream>
 
 using namespace std;
 
 // Creates a node containing one line of text.
-Document::LineNode::LineNode(const string &lineText)
+Document::LineNode::LineNode(const MyString& lineText)
     : text(lineText), next(nullptr)
 {
 }
@@ -25,14 +24,14 @@ Document::~Document()
 
 // Returns the node at a 1-based line number.
 // Returns nullptr if the line number is invalid.
-Document::LineNode *Document::getNode(int lineNumber) const
+Document::LineNode* Document::getNode(int lineNumber) const
 {
     if (lineNumber < 1 || lineNumber > lineCount)
     {
         return nullptr;
     }
 
-    LineNode *current = head;
+    LineNode* current = head;
 
     for (int i = 1; i < lineNumber; i++)
     {
@@ -45,11 +44,11 @@ Document::LineNode *Document::getNode(int lineNumber) const
 // Deletes all nodes and resets the document.
 void Document::clear()
 {
-    LineNode *current = head;
+    LineNode* current = head;
 
     while (current != nullptr)
     {
-        LineNode *nodeToDelete = current;
+        LineNode* nodeToDelete = current;
         current = current->next;
         delete nodeToDelete;
     }
@@ -59,10 +58,10 @@ void Document::clear()
 }
 
 // Exchanges the contents of two documents without copying nodes.
-void Document::swap(Document &other) noexcept
+void Document::swap(Document& other) noexcept
 {
     // Swap the head pointers.
-    LineNode *tempHead = head;
+    LineNode* tempHead = head;
     head = other.head;
     other.head = tempHead;
 
@@ -80,7 +79,7 @@ bool Document::isEmpty() const
 
 // Inserts a line at a 1-based position.
 // Valid positions are from 1 to lineCount + 1.
-bool Document::insertLine(int lineNumber, const string &text)
+bool Document::insertLine(int lineNumber, const MyString& text)
 {
     if (lineNumber < 1 || lineNumber > lineCount + 1)
     {
@@ -88,7 +87,7 @@ bool Document::insertLine(int lineNumber, const string &text)
     }
 
     // Create the new node before changing the linked list.
-    LineNode *newNode = new LineNode(text);
+    LineNode* newNode = new LineNode(text);
 
     if (lineNumber == 1)
     {
@@ -97,7 +96,7 @@ bool Document::insertLine(int lineNumber, const string &text)
     }
     else
     {
-        LineNode *previous = getNode(lineNumber - 1);
+        LineNode* previous = getNode(lineNumber - 1);
 
         newNode->next = previous->next;
         previous->next = newNode;
@@ -115,7 +114,7 @@ bool Document::deleteLine(int lineNumber)
         return false;
     }
 
-    LineNode *nodeToDelete;
+    LineNode* nodeToDelete;
 
     if (lineNumber == 1)
     {
@@ -124,7 +123,7 @@ bool Document::deleteLine(int lineNumber)
     }
     else
     {
-        LineNode *previous = getNode(lineNumber - 1);
+        LineNode* previous = getNode(lineNumber - 1);
 
         nodeToDelete = previous->next;
         previous->next = nodeToDelete->next;
@@ -137,9 +136,9 @@ bool Document::deleteLine(int lineNumber)
 }
 
 // Copies the requested line into result.
-bool Document::getLine(int lineNumber, string &result) const
+bool Document::getLine(int lineNumber, MyString& result) const
 {
-    LineNode *node = getNode(lineNumber);
+    LineNode* node = getNode(lineNumber);
 
     if (node == nullptr)
     {
@@ -151,9 +150,9 @@ bool Document::getLine(int lineNumber, string &result) const
 }
 
 // Replaces the complete text of an existing line.
-bool Document::updateLine(int lineNumber, const string &text)
+bool Document::updateLine(int lineNumber, const MyString& text)
 {
-    LineNode *node = getNode(lineNumber);
+    LineNode* node = getNode(lineNumber);
 
     if (node == nullptr)
     {
@@ -165,7 +164,7 @@ bool Document::updateLine(int lineNumber, const string &text)
 }
 
 // Adds a new line at the end of the document.
-bool Document::appendLine(const string &text)
+bool Document::appendLine(const MyString& text)
 {
     return insertLine(lineCount + 1, text);
 }
@@ -175,43 +174,43 @@ bool Document::appendLine(const string &text)
 bool Document::insertText(
     int lineNumber,
     int position,
-    const string &text)
+    const MyString& text)
 {
-    LineNode *node = getNode(lineNumber);
+    LineNode* node = getNode(lineNumber);
 
     if (node == nullptr ||
         position < 0 ||
-        position > static_cast<int>(node->text.length()))
+        position > node->text.length())
     {
         return false;
     }
 
-    node->text.insert(static_cast<string::size_type>(position), text);
+    node->text.insert(position, text);
 
     return true;
 }
 
 // Deletes characters from a 0-based position.
-// If length goes beyond the end of the line, deletes the remaining characters.
+// If length goes beyond the end of the line,
+// deletes the remaining characters.
 // The deleted characters are returned through deletedText.
 bool Document::deleteText(
     int lineNumber,
     int position,
     int length,
-    string &deletedText)
+    MyString& deletedText)
 {
-    LineNode *node = getNode(lineNumber);
+    LineNode* node = getNode(lineNumber);
 
     if (node == nullptr ||
         position < 0 ||
         length < 0 ||
-        position > static_cast<int>(node->text.length()))
+        position > node->text.length())
     {
         return false;
     }
 
-    int availableLength =
-        static_cast<int>(node->text.length()) - position;
+    int availableLength = node->text.length() - position;
 
     int actualLength = length;
 
@@ -221,13 +220,11 @@ bool Document::deleteText(
     }
 
     // Store the removed text before changing the original line.
-    string removedText = node->text.substr(
-        static_cast<string::size_type>(position),
-        static_cast<string::size_type>(actualLength));
+    MyString removedText = node->text.subpart(
+        position,
+        actualLength);
 
-    node->text.erase(
-        static_cast<string::size_type>(position),
-        static_cast<string::size_type>(actualLength));
+    node->text.erase(position, actualLength);
 
     deletedText.swap(removedText);
 
@@ -243,7 +240,7 @@ void Document::display() const
         return;
     }
 
-    LineNode *current = head;
+    LineNode* current = head;
     int currentLine = 1;
 
     while (current != nullptr)
@@ -266,11 +263,11 @@ int Document::getLineCount() const
 int Document::getCharacterCount() const
 {
     int characterCount = 0;
-    LineNode *current = head;
+    LineNode* current = head;
 
     while (current != nullptr)
     {
-        characterCount += static_cast<int>(current->text.length());
+        characterCount += current->text.length();
         current = current->next;
     }
 
@@ -281,16 +278,31 @@ int Document::getCharacterCount() const
 int Document::getWordCount() const
 {
     int wordCount = 0;
-    LineNode *current = head;
+    LineNode* current = head;
 
     while (current != nullptr)
     {
-        istringstream lineStream(current->text);
-        string word;
+        bool insideWord = false;
 
-        while (lineStream >> word)
+        for (int i = 0; i < current->text.length(); i++)
         {
-            wordCount++;
+            char ch = current->text[i];
+
+            // Check for whitespace characters.
+            if (ch == ' ' || ch == '\t' ||
+                ch == '\n' || ch == '\r' ||
+                ch == '\f' || ch == '\v')
+            {
+                insideWord = false;
+            }
+            else
+            {
+                if (!insideWord)
+                {
+                    wordCount++;
+                    insideWord = true;
+                }
+            }
         }
 
         current = current->next;

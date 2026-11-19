@@ -8,10 +8,10 @@ class Document
 private:
     struct LineNode
     {
-        std::string text;
+        MyString text;
         LineNode* next;
 
-        LineNode(const std::string& lineText);
+        LineNode(const MyString& lineText);
     };
 
     LineNode* head;
@@ -40,31 +40,31 @@ public:
     // Line operations.
     bool insertLine(
         int lineNumber,
-        const std::string& text);
+        const MyString& text);
 
     bool deleteLine(int lineNumber);
 
     bool getLine(
         int lineNumber,
-        std::string& result) const;
+        MyString& result) const;
 
     bool updateLine(
         int lineNumber,
-        const std::string& text);
+        const MyString& text);
 
-    bool appendLine(const std::string& text);
+    bool appendLine(const MyString& text);
 
     // Character operations.
     bool insertText(
         int lineNumber,
         int position,
-        const std::string& text);
+        const MyString& text);
 
     bool deleteText(
         int lineNumber,
         int position,
         int length,
-        std::string& deletedText);
+        MyString& deletedText);
 
     // Document output.
     void display() const;
